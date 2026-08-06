@@ -66,6 +66,23 @@ jobs:
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
 
+      # Own MOK key used to sign the acpi_call kernel module built in
+      # Containerfile's builder stage; only ever touches disk on the runner,
+      # mounted into the build as podman secrets, never baked into a layer.
+      - name: Prepare MOK secrets
+        id: mok-secrets
+        run: |
+          MOK_KEY_FILE="${RUNNER_TEMP}/mok_key.pem"
+          MOK_PASS_FILE="${RUNNER_TEMP}/mok_key_passphrase"
+          MOK_PUB_FILE="${RUNNER_TEMP}/mok_pub.der"
+          printf '%s' "${{ secrets.MOK_KEY }}" > "${MOK_KEY_FILE}"
+          printf '%s' "${{ secrets.MOK_KEY_PASSPHRASE }}" > "${MOK_PASS_FILE}"
+          echo "${{ secrets.MOK_PUB_B64 }}" | base64 -d > "${MOK_PUB_FILE}"
+          chmod 600 "${MOK_KEY_FILE}" "${MOK_PASS_FILE}" "${MOK_PUB_FILE}"
+          echo "MOK_KEY_FILE=${MOK_KEY_FILE}" >> "${GITHUB_ENV}"
+          echo "MOK_PASS_FILE=${MOK_PASS_FILE}" >> "${GITHUB_ENV}"
+          echo "MOK_PUB_FILE=${MOK_PUB_FILE}" >> "${GITHUB_ENV}"
+
       # This actually builds the container image
       - name: Build Image
         id: build-image
@@ -73,6 +90,7 @@ jobs:
           sudo -E $(command -v just) build \
             ${IMAGE_NAME} \
             ${DEFAULT_TAG}
+          shred -u "${MOK_KEY_FILE}" "${MOK_PASS_FILE}" "${MOK_PUB_FILE}"
 
       # This is optional, this provides smaller delta updates
       - name: Rechunk with rpm-ostree

@@ -1,0 +1,12 @@
+[Unit]
+Description=Fingerabdruckleser bei geschlossenem Deckel deaktivieren (GDM/polkit-Hang-Fix)
+After=multi-user.target dbus.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/fprintd-lid-watch/fprintd-lid-watch.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

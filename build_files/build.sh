@@ -7,21 +7,13 @@ cp -avf "/ctx/system_files"/. /
 
 ### Install packages
 
-# Packages can be installed from any enabled yum repo on the image.
-# RPMfusion repos are available by default in ublue main images
-# List of rpmfusion packages can be found here:
-# https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/43/x86_64/repoview/index.html&protocol=https&redirect=1
+dnf5 install -y libvirt qemu-kvm virt-viewer gtk4-layer-shell
 
-# this installs a package from fedora repos
-dnf5 install -y tmux
+# Wacom ghost-cursor fix (patched mutter/mutter-common), gnome-rounded-blur
+# (for Blur my Shell's rounded-corner support) and the signed acpi_call
+# kernel module were all built in the builder stage; install the results.
+dnf5 install -y /rpms/*.rpm
 
-# Use a COPR Example:
-#
-# dnf5 -y copr enable ublue-os/staging
-# dnf5 -y install package
-# Disable COPRs so they don't end up enabled on the final image:
-# dnf5 -y copr disable ublue-os/staging
+### Enable services
 
-#### Example for enabling a System Unit File
-
-systemctl enable podman.socket
+systemctl enable fprintd-lid-watch.service

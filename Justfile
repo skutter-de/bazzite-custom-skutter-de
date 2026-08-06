@@ -121,8 +121,19 @@ build $target_image=image_name $tag=default_tag:
     LABELS+=("--label" "org.opencontainers.image.title={{ image_name }}")
     LABELS+=("--label" "org.opencontainers.image.vendor={{ repo_organization }}")
 
+    # MOK key/passphrase/pubcert used to sign the acpi_call kernel module,
+    # provided as files via $MOK_KEY_FILE/$MOK_PASS_FILE/$MOK_PUB_FILE (set by
+    # CI, see .github/workflows/build.yml). Optional for local test builds -
+    # build-acpi_call.sh's step is simply skipped/fails gracefully without them.
+    SECRETS=()
+    if [[ -n "${MOK_KEY_FILE:-}" && -n "${MOK_PASS_FILE:-}" && -n "${MOK_PUB_FILE:-}" ]]; then
+        SECRETS+=("--secret" "id=mok_key,src=${MOK_KEY_FILE}")
+        SECRETS+=("--secret" "id=mok_key_passphrase,src=${MOK_PASS_FILE}")
+        SECRETS+=("--secret" "id=mok_pub,src=${MOK_PUB_FILE}")
+    fi
+
     # This actually builds the image!
-    PODMAN_BUILD_ARGS=("${BUILD_ARGS[@]}" "${LABELS[@]}" --pull=newer --tag "${target_image}:${tag}" --file Containerfile)
+    PODMAN_BUILD_ARGS=("${BUILD_ARGS[@]}" "${LABELS[@]}" "${SECRETS[@]}" --pull=newer --tag "${target_image}:${tag}" --file Containerfile)
 
     podman build "${PODMAN_BUILD_ARGS[@]}" .
 
