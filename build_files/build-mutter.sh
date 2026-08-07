@@ -9,7 +9,13 @@ set -ouex pipefail
 WORKDIR="$(mktemp -d)"
 cd "${WORKDIR}"
 
-dnf5 install -y rpm-build 'dnf5-command(builddep)' 'dnf5-command(download)'
+dnf5 install -y rpm-build 'dnf5-command(builddep)' 'dnf5-command(download)' 'dnf5-command(config-manager)'
+
+# Bazzite ships mesa from Terra (not stock Fedora repos), disabled by default
+# in this build context - without it, dnf can't find a matching mesa-*-devel
+# for the mesa version actually installed, and builddep fails outright.
+dnf5 config-manager setopt terra.enabled=1
+dnf5 config-manager setopt terra-mesa.enabled=1
 
 dnf5 download --source -y mutter
 rpm -i --define "_topdir ${WORKDIR}/rpmbuild" ./mutter-*.src.rpm
@@ -22,7 +28,10 @@ cp /ctx/patches/mutter-wacom-ghost-cursor.patch "${WORKDIR}/rpmbuild/SOURCES/"
 sed -i '/^Source0:/a Patch0:         mutter-wacom-ghost-cursor.patch' "${SPEC}"
 sed -i 's/^\(Release:[[:space:]]*\)\(.*\)$/\1\2.ghostcursorfix/' "${SPEC}"
 
-dnf5 builddep -y "${SPEC}"
+# Exclude i686: this image never needs multilib, and letting dnf consider
+# 32-bit providers alongside 64-bit ones is what triggers most of the
+# "conflicting requests" noise from mesa/Xwayland multilib packages.
+dnf5 builddep -y --exclude='*.i686' "${SPEC}"
 rpmbuild -bb --define "_topdir ${WORKDIR}/rpmbuild" --nocheck "${SPEC}"
 
 RPMDIR="${WORKDIR}/rpmbuild/RPMS/x86_64"
