@@ -14,18 +14,12 @@ FROM ghcr.io/ublue-os/bazzite-gnome:stable AS base
 
 FROM base AS builder
 
-# mutter and gnome-rounded-blur run in the same RUN/layer on purpose:
-# gnome-rounded-blur needs mutter-devel installed by build-mutter.sh, and
-# splitting them across a layer boundary hit real RPM-database consistency
-# issues (sqlite WAL not flushed before the layer snapshot, then corrupted
-# further by trying to force a checkpoint) - not worth the fragility for two
-# scripts that only take a few minutes combined anyway.
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/build-mutter.sh && /ctx/build-gnome-rounded-blur.sh
-
+# All three build scripts run in a single RUN/layer on purpose: splitting
+# them across layer boundaries repeatedly hit real RPM-database corruption
+# on the build runner ("rpmdb: damaged header", "database disk image is
+# malformed") once a layer with heavy package activity got snapshotted and
+# the next RUN step started from it. Keeping everything in one layer avoids
+# that boundary entirely.
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
@@ -33,7 +27,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=secret,id=mok_key \
     --mount=type=secret,id=mok_key_passphrase \
     --mount=type=secret,id=mok_pub \
-    /ctx/build-acpi_call.sh
+    /ctx/build-mutter.sh && /ctx/build-gnome-rounded-blur.sh && /ctx/build-acpi_call.sh
 
 ### FINAL IMAGE
 ## Installs the RPMs built above plus everything else, as recommended by
