@@ -2,8 +2,9 @@
 # Rebuilds mutter with the Wacom ghost-cursor fix (patches/mutter-wacom-ghost-cursor.patch)
 # applied via the standard RPM Patch0/%autopatch mechanism, against whatever
 # mutter version this image's Fedora repos currently provide.
-# Runs in the builder stage. Leaves mutter+mutter-common (for the final image)
-# and mutter-devel (needed by build-gnome-rounded-blur.sh, same stage) installed.
+# Runs in the builder stage, in the same RUN step as build-gnome-rounded-blur.sh
+# (see Containerfile). Leaves mutter+mutter-common (for the final image) and
+# mutter-devel (needed by build-gnome-rounded-blur.sh right after) installed.
 set -ouex pipefail
 
 WORKDIR="$(mktemp -d)"
@@ -56,22 +57,5 @@ cp "${RPMDIR}"/mutter-[0-9]*.rpm "${NOARCHDIR}"/mutter-common-*.rpm /rpms/
 # but must not end up in the final image, so install it here rather than
 # copying it to /rpms.
 dnf5 install -y "${RPMDIR}"/mutter-[0-9]*.rpm "${NOARCHDIR}"/mutter-common-*.rpm "${RPMDIR}"/mutter-devel-[0-9]*.rpm
-
-# The RPM database uses sqlite with WAL journalling. If this stage's layer
-# gets committed while changes are still sitting in the WAL file rather than
-# the main rpmdb.sqlite, the *next* RUN step in the Containerfile can see a
-# stale/incomplete package database - which is exactly what happened here
-# (mutter-devel "installed" successfully, but pkgconfig(libmutter-18) wasn't
-# resolvable anymore in the following build-gnome-rounded-blur.sh step).
-# `rpm --rebuilddb` tries to replace the whole db directory and fails in this
-# build environment, so checkpoint the WAL directly instead (via python3's
-# stdlib sqlite3 module - no extra package needed) to flush it into
-# rpmdb.sqlite before this layer is snapshotted.
-python3 -c "
-import sqlite3
-conn = sqlite3.connect('/usr/share/rpm/rpmdb.sqlite')
-conn.execute('PRAGMA wal_checkpoint(TRUNCATE);')
-conn.close()
-"
 
 rm -rf "${WORKDIR}"
