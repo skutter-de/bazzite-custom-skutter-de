@@ -40,7 +40,7 @@ sed -i 's/^\(Release:[[:space:]]*\)\(.*\)$/\1\2.ghostcursorfix/' "${SPEC}"
 # version this build actually fetched. Drop `-S git` so %autosetup falls
 # back to the regular (fuzz-tolerant) `%patch` mechanism; Patch0 is still
 # applied the standard way, just with a more forgiving engine.
-sed -i 's/^%autosetup -S git /%autosetup /' "${SPEC}"
+sed -i 's/^%autosetup -S git /%autosetup -p1 /' "${SPEC}"
 
 # Exclude i686: this image never needs multilib, and letting dnf consider
 # 32-bit providers alongside 64-bit ones is what triggers most of the
