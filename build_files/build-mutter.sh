@@ -55,6 +55,6 @@ cp "${RPMDIR}"/mutter-[0-9]*.rpm "${NOARCHDIR}"/mutter-common-*.rpm /rpms/
 # mutter-devel is needed later in this same builder stage (gnome-rounded-blur),
 # but must not end up in the final image, so install it here rather than
 # copying it to /rpms.
-dnf5 install -y "${RPMDIR}"/mutter-[0-9]*.rpm "${NOARCHDIR}"/mutter-common-*.rpm "${RPMDIR}"/mutter-devel-*.rpm
+dnf5 install -y "${RPMDIR}"/mutter-[0-9]*.rpm "${NOARCHDIR}"/mutter-common-*.rpm "${RPMDIR}"/mutter-devel-[0-9]*.rpm
 
 rm -rf "${WORKDIR}"
