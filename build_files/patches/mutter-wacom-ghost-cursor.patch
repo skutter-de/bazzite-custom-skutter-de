@@ -1,7 +1,7 @@
-diff -ru a/mutter-50.1/clutter/clutter/clutter-stage.c b/mutter-50.1/clutter/clutter/clutter-stage.c
---- a/mutter-50.1/clutter/clutter/clutter-stage.c	2026-04-14 15:37:46.000000000 +0200
-+++ b/mutter-50.1/clutter/clutter/clutter-stage.c	2026-08-07 01:15:26.417324849 +0200
-@@ -3566,6 +3566,14 @@
+diff -ru a/clutter/clutter/clutter-stage.c b/clutter/clutter/clutter-stage.c
+--- a/clutter/clutter/clutter-stage.c	2026-07-03 00:55:56.000000000 +0200
++++ b/clutter/clutter/clutter-stage.c	2026-08-07 09:12:34.349107502 +0200
+@@ -3572,6 +3572,15 @@
    if (clutter_sprite_get_role (sprite) == CLUTTER_SPRITE_ROLE_TOUCHPOINT)
      return TRUE;
  
@@ -13,12 +13,13 @@ diff -ru a/mutter-50.1/clutter/clutter/clutter-stage.c b/mutter-50.1/clutter/clu
 +      g_object_get_data (G_OBJECT (sprite), "wacom-out-of-proximity"))
 +    return TRUE;
 +
-   clutter_sprite_get_coords (sprite, &coords);
-   pointer_view = clutter_stage_get_view_at (stage,
-                                             coords.x,
-diff -ru a/mutter-50.1/src/backends/native/meta-seat-native.c b/mutter-50.1/src/backends/native/meta-seat-native.c
---- a/mutter-50.1/src/backends/native/meta-seat-native.c	2026-04-14 15:37:46.000000000 +0200
-+++ b/mutter-50.1/src/backends/native/meta-seat-native.c	2026-08-07 01:15:26.416178044 +0200
++  clutter_sprite_get_coords (sprite, &coords);
+   if (!clutter_focus_get_current_actor (CLUTTER_FOCUS (sprite)))
+     return TRUE;
+ 
+diff -ru a/src/backends/native/meta-seat-native.c b/src/backends/native/meta-seat-native.c
+--- a/src/backends/native/meta-seat-native.c	2026-07-03 00:55:56.000000000 +0200
++++ b/src/backends/native/meta-seat-native.c	2026-08-07 09:12:34.347788887 +0200
 @@ -105,7 +105,16 @@
  
        sprite = clutter_backend_get_sprite (clutter_backend, stage, event);
@@ -37,9 +38,9 @@ diff -ru a/mutter-50.1/src/backends/native/meta-seat-native.c b/mutter-50.1/src/
      }
  
    return FALSE;
-diff -ru a/mutter-50.1/src/backends/native/meta-sprite-native.c b/mutter-50.1/src/backends/native/meta-sprite-native.c
---- a/mutter-50.1/src/backends/native/meta-sprite-native.c	2026-04-14 15:37:46.000000000 +0200
-+++ b/mutter-50.1/src/backends/native/meta-sprite-native.c	2026-08-07 01:15:26.415881275 +0200
+diff -ru a/src/backends/native/meta-sprite-native.c b/src/backends/native/meta-sprite-native.c
+--- a/src/backends/native/meta-sprite-native.c	2026-07-03 00:55:56.000000000 +0200
++++ b/src/backends/native/meta-sprite-native.c	2026-08-07 09:12:34.347418562 +0200
 @@ -45,6 +45,13 @@
    MetaBackend *backend = meta_sprite_get_backend (META_SPRITE (focus));
    MetaCursorRenderer *cursor_renderer;

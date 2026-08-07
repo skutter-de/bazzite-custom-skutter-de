@@ -34,6 +34,13 @@ cp /ctx/patches/mutter-wacom-ghost-cursor.patch "${WORKDIR}/rpmbuild/SOURCES/"
 # considered newer than the stock package it replaces.
 sed -i '/^Source0:/a Patch0:         mutter-wacom-ghost-cursor.patch' "${SPEC}"
 sed -i 's/^\(Release:[[:space:]]*\)\(.*\)$/\1\2.ghostcursorfix/' "${SPEC}"
+# Fedora's spec applies patches via `%autosetup -S git`, which uses `git
+# apply` under the hood - stricter than classic `patch` about context drift
+# between the mutter version our patch was written against and whatever
+# version this build actually fetched. Drop `-S git` so %autosetup falls
+# back to the regular (fuzz-tolerant) `%patch` mechanism; Patch0 is still
+# applied the standard way, just with a more forgiving engine.
+sed -i 's/^%autosetup -S git /%autosetup /' "${SPEC}"
 
 # Exclude i686: this image never needs multilib, and letting dnf consider
 # 32-bit providers alongside 64-bit ones is what triggers most of the
