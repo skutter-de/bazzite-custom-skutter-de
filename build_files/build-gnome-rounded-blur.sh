@@ -18,8 +18,9 @@ git -C "${WORKDIR}/src" archive --format=tar.gz \
     --prefix="gnome-rounded-blur-${VERSION}/" "v${VERSION}" \
     -o "${WORKDIR}/SOURCES/gnome-rounded-blur-${VERSION}.tar.gz"
 
-mkdir -p /rpms
+mkdir -p /rpms "${WORKDIR}/rpmbuild"/{BUILD,BUILDROOT,SPECS,SRPMS}
 rpmbuild -bb \
+    --define "_topdir ${WORKDIR}/rpmbuild" \
     --define "_sourcedir ${WORKDIR}/SOURCES" \
     --define "_rpmdir /rpms" \
     /ctx/specs/gnome-rounded-blur.spec

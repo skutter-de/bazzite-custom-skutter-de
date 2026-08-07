@@ -31,8 +31,9 @@ openssl pkey -in /run/secrets/mok_key -passin file:/run/secrets/mok_key_passphra
     "${WORKDIR}/mok_key.decrypted" /run/secrets/mok_pub "${WORKDIR}/acpi_call.ko"
 shred -u "${WORKDIR}/mok_key.decrypted"
 
-mkdir -p /rpms
+mkdir -p /rpms "${WORKDIR}/rpmbuild"/{BUILD,BUILDROOT,SPECS,SRPMS}
 rpmbuild -bb \
+    --define "_topdir ${WORKDIR}/rpmbuild" \
     --define "_sourcedir ${WORKDIR}" \
     --define "_rpmdir /rpms" \
     --define "kver ${KVER}" \
