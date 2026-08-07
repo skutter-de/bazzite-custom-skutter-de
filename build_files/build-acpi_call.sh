@@ -13,6 +13,12 @@ dnf5 install -y dkms kernel-devel-"${KVER}" gcc make
 
 git clone --depth 1 https://github.com/nix-community/acpi_call.git "${WORKDIR}/acpi_call"
 
+# dkms add needs a real dkms.conf (module name + version) to know what it's
+# adding; the repo only ships a dkms.conf.in template with the version
+# substituted in by its own Makefile's `dkms-add` target at build time.
+sed "s/@@VERSION@@/$(cat "${WORKDIR}/acpi_call/VERSION")/" \
+    "${WORKDIR}/acpi_call/dkms.conf.in" > "${WORKDIR}/acpi_call/dkms.conf"
+
 dkms add "${WORKDIR}/acpi_call" --sourcetree "${WORKDIR}/dkms-src"
 dkms build acpi_call/1.2.2 --sourcetree "${WORKDIR}/dkms-src" -k "${KVER}"
 
