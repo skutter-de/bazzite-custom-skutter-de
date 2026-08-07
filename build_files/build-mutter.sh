@@ -17,6 +17,13 @@ dnf5 install -y rpm-build 'dnf5-command(builddep)' 'dnf5-command(download)' 'dnf
 dnf5 config-manager setopt terra.enabled=1
 dnf5 config-manager setopt terra-mesa.enabled=1
 
+# Bazzite also ships its own patched xorg-x11-server-Xwayland build, pinned
+# via /etc/dnf/versionlock.toml, with no matching -devel counterpart
+# anywhere. Drop the versionlock and let dnf replace it with stock Fedora
+# Xwayland for this builder stage only - harmless, none of it reaches the
+# final image (only the mutter/mutter-common RPMs built here do).
+dnf5 versionlock delete xorg-x11-server-Xwayland
+
 dnf5 download --source -y mutter
 rpm -i --define "_topdir ${WORKDIR}/rpmbuild" ./mutter-*.src.rpm
 
