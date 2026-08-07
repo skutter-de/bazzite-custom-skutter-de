@@ -49,11 +49,12 @@ dnf5 builddep -y --exclude='*.i686' "${SPEC}"
 rpmbuild -bb --define "_topdir ${WORKDIR}/rpmbuild" --nocheck "${SPEC}"
 
 RPMDIR="${WORKDIR}/rpmbuild/RPMS/x86_64"
+NOARCHDIR="${WORKDIR}/rpmbuild/RPMS/noarch"
 mkdir -p /rpms
-cp "${RPMDIR}"/mutter-[0-9]*.rpm "${RPMDIR}"/mutter-common-*.rpm /rpms/
+cp "${RPMDIR}"/mutter-[0-9]*.rpm "${NOARCHDIR}"/mutter-common-*.rpm /rpms/
 # mutter-devel is needed later in this same builder stage (gnome-rounded-blur),
 # but must not end up in the final image, so install it here rather than
 # copying it to /rpms.
-dnf5 install -y "${RPMDIR}"/mutter-[0-9]*.rpm "${RPMDIR}"/mutter-common-*.rpm "${RPMDIR}"/mutter-devel-*.rpm
+dnf5 install -y "${RPMDIR}"/mutter-[0-9]*.rpm "${NOARCHDIR}"/mutter-common-*.rpm "${RPMDIR}"/mutter-devel-*.rpm
 
 rm -rf "${WORKDIR}"
