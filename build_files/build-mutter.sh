@@ -18,6 +18,15 @@ dnf5 install -y rpm-build 'dnf5-command(builddep)' 'dnf5-command(download)' 'dnf
 dnf5 config-manager setopt terra.enabled=1
 dnf5 config-manager setopt terra-mesa.enabled=1
 
+# Bazzite adds excludepkgs=mesa* (or similar) system-wide to prevent stock
+# Fedora repos from overriding its terra-mesa install. Since terra-mesa
+# 26.2.2 this filter also blocks terra-mesa's own mesa-libgbm from being
+# used as a dependency provider, so builddep can't satisfy mesa-libgbm-devel.
+# Clear all excludepkgs globally - this builder stage is ephemeral and the
+# change never reaches the final image.
+sed -i 's/^excludepkgs=.*//' /etc/dnf/dnf.conf 2>/dev/null || true
+dnf5 config-manager setopt "*.excludepkgs=" 2>/dev/null || true
+
 # Bazzite also ships its own patched xorg-x11-server-Xwayland build, pinned
 # via /etc/dnf/versionlock.toml, with no matching -devel counterpart
 # anywhere. Drop the versionlock and let dnf replace it with stock Fedora
