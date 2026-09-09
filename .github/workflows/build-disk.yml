@@ -15,12 +15,18 @@ on:
         options:
           - amd64
           - arm64
+  schedule:
+    # Sunday 11:00 UTC - an hour after build.yml's daily 10:05 UTC run, so
+    # the ':latest' container tag it builds from is always fresh. amd64
+    # only (see runs-on below); arm64 stays a manual workflow_dispatch
+    # option, weekly arm64 disk builds aren't needed here.
+    - cron: '00 11 * * 0'
   pull_request:
     branches:
       - main
     paths:
       - './disk_config/disk.toml'
-      - './disk_config/iso.toml'
+      - './disk_config/iso-gnome.toml'
       - './.github/workflows/build-disk.yml'
 
 env:
@@ -36,7 +42,10 @@ concurrency:
 jobs:
   build:
     name: Build disk images
-    runs-on: ${{ inputs.platform == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+    # inputs.platform is only set on workflow_dispatch; schedule/pull_request
+    # runs have no inputs at all, so default those to the amd64 runner
+    # instead of falling through to arm64.
+    runs-on: ${{ inputs.platform == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
       matrix:
@@ -82,7 +91,7 @@ jobs:
         uses: osbuild/bootc-image-builder-action@8661cd3832544ad68c12dcde8681b13ab0f56a8d # main
         with:
           builder-image: ${{ env.BIB_IMAGE }}
-          config-file: ${{ matrix.disk-type == 'anaconda-iso' && './disk_config/iso.toml' || './disk_config/disk.toml' }}
+          config-file: ${{ matrix.disk-type == 'anaconda-iso' && './disk_config/iso-gnome.toml' || './disk_config/disk.toml' }}
           image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
           chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
           types: ${{ matrix.disk-type }}
@@ -92,12 +101,13 @@ jobs:
         if: inputs.upload-to-s3 != true && github.event_name != 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
+          name: disk-${{ env.DISK_TYPE }}
           path: ${{ steps.build.outputs.output-directory }}
           if-no-files-found: error
           retention-days: 0
           compression-level: 0
           overwrite: true
-      
+
       - name: Upload to S3
         if: inputs.upload-to-s3 == true && github.event_name != 'pull_request'
         shell: bash
@@ -113,3 +123,48 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rclone
           rclone copy $SOURCE_DIR S3:${{ secrets.S3_BUCKET_NAME }}
+
+  release:
+    name: Publish weekly release
+    # Only for the actual weekly run, not for one-off manual dispatches or
+    # PR previews - those still get their images via the per-job artifacts
+    # above (retention-days: 0 = repo default, not "unlimited").
+    if: github.event_name == 'schedule'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download disk image artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+          pattern: disk-*
+          merge-multiple: true
+
+      - name: Prepare release
+        id: prep
+        run: |
+          TAG="disk-$(date -u +%Y%m%d)"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "title=Disk images ${TAG#disk-}" >> "${GITHUB_OUTPUT}"
+          find artifacts -type f | sort
+          # bootc-image-builder already writes its own checksum files
+          # alongside each disk image; nothing extra to generate here.
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # artifacts/**/* would need `shopt -s globstar`, which Actions'
+          # default bash run-shell doesn't enable - enumerate explicitly.
+          mapfile -t files < <(find artifacts -type f)
+          gh release create "${{ steps.prep.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ steps.prep.outputs.title }}" \
+            --notes "Automatischer woechentlicher Build (qcow2 + Anaconda-ISO) von \`${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}\` (Digest zum Build-Zeitpunkt, siehe build.yml-Läufe für Details)." \
+            "${files[@]}"
