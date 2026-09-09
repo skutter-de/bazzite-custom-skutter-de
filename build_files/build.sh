@@ -5,6 +5,11 @@ set -ouex pipefail
 # Copy the contents of system_files/ of the git repo to /
 cp -avf "/ctx/system_files"/. /
 
+# Lenovo's proprietary libmodemauth.so (FCC-unlock for the L860-GL WWAN
+# modem) - downloaded+verified here rather than committed to this repo,
+# see the script for why.
+/ctx/fetch-libmodemauth.sh
+
 ### Install packages
 
 dnf5 install -y libvirt qemu-kvm virt-viewer gtk4-layer-shell

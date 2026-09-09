@@ -1,0 +1,10 @@
+# Fibocom L860-GL / Intel XMM7560 WWAN-Modem: sobald das PCIe-Geraet
+# erscheint (idVendor 8086, idProduct 7560), auf USB-Modus umschalten.
+# Ersetzt den frueheren xmm-l860-boot.service: statt auf eine zeitliche
+# Boot-Reihenfolge (Before=NetworkManager.service ModemManager.service) zu
+# vertrauen, reagiert diese Regel kausal auf das tatsaechliche Erscheinen
+# des Geraets - die USB-AT-Ports (und damit ModemManager) existieren
+# schlicht noch nicht, solange xmm2usb nicht durchgelaufen ist. Der
+# anschliessende FCC-Unlock laeuft separat als ModemManager-Hook, siehe
+# /etc/ModemManager/fcc-unlock.d/8087:095a.
+SUBSYSTEM=="pci", ATTR{vendor}=="0x8086", ATTR{device}=="0x7560", RUN+="/usr/libexec/xmm-l860/xmm2usb"
