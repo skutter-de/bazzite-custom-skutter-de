@@ -23,6 +23,17 @@ dnf5 install -y libvirt qemu-kvm virt-viewer gtk4-layer-shell
 # them - find every *.rpm anywhere under /rpms instead.
 dnf5 install -y $(find /rpms -name '*.rpm' ! -name '*-debuginfo-*' ! -name '*-debugsource-*')
 
+# The base image ships terra-mesa enabled by default (for its own mesa
+# packages, already installed above - nothing here still needs it fetched
+# again). Leaving it enabled in the shipped image breaks bootc-image-builder's
+# ISO manifest depsolve: it fails to read the repo's local file://
+# gpgkey from within its own build sandbox ("Could not read a file:// file
+# for .../RPM-GPG-KEY-terra44-mesa"), even though that key is present and
+# correct in the actual running system. Switch it back off now that we're
+# done with it - doesn't affect already-installed packages, next image
+# build re-enables+uses it fresh from the base image regardless.
+dnf5 config-manager setopt terra-mesa.enabled=0
+
 ### Enable services
 
 systemctl enable fprintd-lid-watch.service
