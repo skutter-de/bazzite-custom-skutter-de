@@ -32,7 +32,15 @@ dnf5 install -y $(find /rpms -name '*.rpm' ! -name '*-debuginfo-*' ! -name '*-de
 # correct in the actual running system. Switch it back off now that we're
 # done with it - doesn't affect already-installed packages, next image
 # build re-enables+uses it fresh from the base image regardless.
-dnf5 config-manager setopt terra-mesa.enabled=0
+#
+# `dnf5 config-manager setopt terra-mesa.enabled=0` does NOT persist this
+# to the repo file (verified: enabled=1 was still there in the shipped
+# image after using it) - it only affects dnf5's own runtime view, which
+# bootc-image-builder's separate depsolve process never reads anyway.
+# Edit the repo file directly instead.
+sed -i '0,/^enabled=1$/{s/^enabled=1$/enabled=0/}' /etc/yum.repos.d/terra-mesa.repo
+grep -A10 '^\[terra-mesa\]$' /etc/yum.repos.d/terra-mesa.repo | grep -m1 '^enabled=0$' || \
+    { echo "terra-mesa.repo: enabled=0 did not take, aborting" >&2; exit 1; }
 
 ### Enable services
 
