@@ -37,6 +37,15 @@ openssl pkey -in /run/secrets/mok_key -passin file:/run/secrets/mok_key_passphra
     "${WORKDIR}/mok_key.decrypted" /run/secrets/mok_pub "${WORKDIR}/acpi_call.ko"
 shred -u "${WORKDIR}/mok_key.decrypted"
 
+# Fail the build loudly here rather than shipping an unsigned module that
+# only surfaces as "Key was rejected by service" at load time on a user's
+# machine. A signed module has "~Module signature appended~" as its last 28
+# bytes.
+if [ "$(tail -c 28 "${WORKDIR}/acpi_call.ko")" != "~Module signature appended~" ]; then
+    echo "acpi_call.ko is missing its Secure Boot signature after signing, aborting" >&2
+    exit 1
+fi
+
 mkdir -p /rpms "${WORKDIR}/rpmbuild"/{BUILD,BUILDROOT,SPECS,SRPMS}
 rpmbuild -bb \
     --define "_topdir ${WORKDIR}/rpmbuild" \
@@ -44,5 +53,14 @@ rpmbuild -bb \
     --define "_rpmdir /rpms" \
     --define "kver ${KVER}" \
     /ctx/specs/kmod-acpi_call.spec
+
+# Same check against the file the RPM actually packaged - catches the
+# rpmbuild-strips-the-signature failure mode this used to have, not just a
+# broken sign-file step.
+PACKAGED_KO="${WORKDIR}/rpmbuild/BUILDROOT"/*/usr/lib/modules/"${KVER}"/extra/acpi_call.ko
+if [ "$(tail -c 28 $PACKAGED_KO)" != "~Module signature appended~" ]; then
+    echo "acpi_call.ko lost its Secure Boot signature during RPM packaging, aborting" >&2
+    exit 1
+fi
 
 rm -rf "${WORKDIR}"

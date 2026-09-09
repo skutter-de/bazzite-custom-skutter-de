@@ -2,6 +2,16 @@
 # so this always matches the kernel actually shipped in this image build.
 %{!?kver: %define kver %(uname -r)}
 
+# SOURCE0 is already DKMS-built and Secure-Boot-signed by build-acpi_call.sh.
+# rpmbuild's default __os_install_post scripts (brp-strip and friends) would
+# strip the buildroot copy - which silently chops off the appended module
+# signature, since it lives past the end of the normal ELF sections. That
+# turns this into an unsigned module that Secure Boot rejects at load time
+# ("Key was rejected by service") despite everything looking fine at build
+# time. Disable the whole post-install pass; this package only installs one
+# already-finished binary, there's nothing left for it to do anyway.
+%global __os_install_post %{nil}
+
 Name:           kmod-acpi_call
 Version:        1.2.2
 Release:        1%{?dist}
