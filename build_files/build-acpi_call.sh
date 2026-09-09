@@ -56,10 +56,15 @@ rpmbuild -bb \
 
 # Same check against the file the RPM actually packaged - catches the
 # rpmbuild-strips-the-signature failure mode this used to have, not just a
-# broken sign-file step. rpmbuild nests BUILDROOT under BUILD/<pkg>-build/,
-# not directly under _topdir, so locate it instead of assuming the layout.
-PACKAGED_KO="$(find "${WORKDIR}/rpmbuild/BUILD" -path '*/BUILDROOT/*/extra/acpi_call.ko' -print -quit)"
-if [ -z "${PACKAGED_KO}" ] || [ "$(tail -c 28 "${PACKAGED_KO}")" != "~Module signature appended~" ]; then
+# broken sign-file step. rpmbuild's own %clean/rmbuild step already deletes
+# BUILDROOT by the time we get here, so pull the .ko back out of the
+# finished RPM itself instead of poking at the (gone) build tree.
+BUILT_RPM="$(find /rpms -name 'kmod-acpi_call-*.rpm' -print -quit)"
+EXTRACT_DIR="${WORKDIR}/rpm-extract"
+mkdir -p "${EXTRACT_DIR}"
+rpm2cpio "${BUILT_RPM}" | (cd "${EXTRACT_DIR}" && cpio -idm --quiet)
+EXTRACTED_KO="$(find "${EXTRACT_DIR}" -name 'acpi_call.ko' -print -quit)"
+if [ -z "${EXTRACTED_KO}" ] || [ "$(tail -c 28 "${EXTRACTED_KO}")" != "~Module signature appended~" ]; then
     echo "acpi_call.ko lost its Secure Boot signature during RPM packaging, aborting" >&2
     exit 1
 fi
