@@ -15,6 +15,11 @@ on:
         options:
           - amd64
           - arm64
+      publish-release:
+        description: "Als GitHub-Release veroeffentlichen (wie der woechentliche Lauf)"
+        required: false
+        default: false
+        type: boolean
   schedule:
     # Sunday 11:00 UTC - an hour after build.yml's daily 10:05 UTC run, so
     # the ':latest' container tag it builds from is always fresh. amd64
@@ -126,10 +131,12 @@ jobs:
 
   release:
     name: Publish weekly release
-    # Only for the actual weekly run, not for one-off manual dispatches or
-    # PR previews - those still get their images via the per-job artifacts
-    # above (retention-days: 0 = repo default, not "unlimited").
-    if: github.event_name == 'schedule'
+    # The actual weekly run, or a manual dispatch that explicitly opted in
+    # (inputs.publish-release) - e.g. for the first release, or a one-off
+    # re-publish. Plain manual test runs / PR previews still just get their
+    # images via the per-job artifacts above (retention-days: 0 = repo
+    # default, not "unlimited").
+    if: github.event_name == 'schedule' || inputs.publish-release == true
     needs: build
     runs-on: ubuntu-24.04
     permissions:
