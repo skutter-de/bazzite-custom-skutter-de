@@ -1,0 +1,93 @@
+#!/bin/sh
+#
+# Revives the Fibocom L860-GL/XMM7360 WWAN modem after suspend/resume.
+#
+# On this platform the modem's power is sometimes (not always - never
+# fully pinned down how to provoke it) cut on suspend entry without it
+# being exposed to Linux as an ACPI power resource, and nothing restores
+# it on resume - see
+# https://wiki.archlinux.org/title/Intel_XMM_7360#Suspend_and_resume for
+# the general shape of this class of bug on XMM7360 platforms.
+#
+# Unlike the plain PCI-native case that page documents, xmm2usb already
+# switched this modem off the PCIe bus onto USB during boot, so when it
+# dies here the PCI node doesn't linger around as "dead" - it vanishes
+# from sysfs entirely, and a plain `echo 1 > /sys/bus/pci/rescan` does not
+# bring it back. What does: forcing the root port that hosted it back to
+# D0, clearing any leftover PCIe link-disable bit, and calling the
+# modem's own ACPI _RST method directly. After that the modem's firmware
+# falls back onto USB by itself, the same way it does the very first time
+# xmm2usb runs it through this dance at boot. Verified manually against a
+# real dead-after-suspend modem on 2026-09-23; see
+# project_laptop_wwan_l860 in Claude's memory for the session that found
+# this.
+#
+# Run unconditionally after every resume (see the .service unit) - safe
+# and cheap to no-op when the modem survived suspend fine.
+
+die() {
+	echo "ERROR ${1}" >&2
+	exit 1
+}
+
+[ "$(whoami)" = "root" ] || die "must be run as root"
+
+if lsusb -d 8087:095a >/dev/null 2>&1; then
+	echo "Modem already present on USB, nothing to do"
+	exit 0
+fi
+
+STATE=/run/xmm-l860
+if [ ! -e "${STATE}/acpi-path" ] || [ ! -e "${STATE}/bridge-id" ]; then
+	echo "No persisted ACPI path (xmm2usb hasn't run successfully this boot), nothing to do"
+	exit 0
+fi
+read -r acpi_path < "${STATE}/acpi-path"
+read -r bridge_id < "${STATE}/bridge-id"
+
+[ -e /proc/acpi/call ] || modprobe acpi_call || die "could not load acpi_call"
+
+echo "Modem missing after resume, reviving via ${acpi_path}._RST (bridge ${bridge_id})" >&2
+
+# Clear a leftover link-disable bit (bit 4) from xmm2usb's original PCIe
+# ->USB switch, in case the modem's own USB-mode firmware got wiped by
+# the same power cut and it needs to renegotiate from scratch.
+link_ctl=$(setpci -s "${bridge_id}" CAP_EXP+10.w) || die "could not read link control register"
+link_ctl_enabled=$(printf '%04x' $(( 0x${link_ctl} & ~0x10 )))
+setpci -s "${bridge_id}" "CAP_EXP+10.w=${link_ctl_enabled}" || die "could not clear link-disable bit"
+
+# The root port itself is normally runtime-suspended (D3hot) - wake it
+# before touching it further.
+echo on > "/sys/bus/pci/devices/${bridge_id}/power/control" 2>/dev/null
+
+printf "%s" "${acpi_path}._RST" > /proc/acpi/call || die "ACPI _RST failed"
+
+echo 1 > /sys/bus/pci/rescan
+
+for i in $(seq 1 20); do
+	lsusb -d 8087:095a >/dev/null 2>&1 && break
+	sleep 1
+done
+
+if ! lsusb -d 8087:095a >/dev/null 2>&1; then
+	die "modem did not come back on USB after _RST"
+fi
+
+echo "Modem back on USB" >&2
+
+for i in $(seq 1 20); do
+	ls /dev/ttyACM* >/dev/null 2>&1 && break
+	sleep 1
+done
+sleep 2
+
+# Belt and suspenders: normally ModemManager's own fcc-unlock.d hook
+# (/etc/ModemManager/fcc-unlock.d/8087:095a, same script) does this
+# automatically once it sees the modem - but on 2026-09-23 that did not
+# happen reliably for a modem that reappeared via this recovery path
+# rather than a fresh USB plug event, leaving it stuck at `registration:
+# idle` / "Network timeout". Running it here directly is idempotent (it
+# checks AT+CFUN? first and no-ops if already unlocked).
+python3 /usr/libexec/xmm-l860/fcc-unlock.py "revive" ttyACM0 2>&1 || true
+
+systemctl restart ModemManager.service

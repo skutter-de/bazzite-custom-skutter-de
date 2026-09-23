@@ -33,6 +33,15 @@ for path in `find /sys/devices/pci0000:00 -name vendor`; do
 
 	printf "Parent port is at %s\n" "${bridge_id}" >&2
 
+	# Persist for xmm-resume-reset: if this modem later dies across a
+	# suspend/resume cycle (see that script for why), the PCI node found
+	# above will be gone from sysfs by the time we'd need bridge_id/
+	# acpi_path again - vendor/device can no longer be matched to find
+	# them. /run is tmpfs, correctly cleared every real boot.
+	mkdir -p /run/xmm-l860
+	printf '%s\n' "${bridge_id}" > /run/xmm-l860/bridge-id
+	printf '%s\n' "${acpi_path}" > /run/xmm-l860/acpi-path
+
 	printf "Disabling PCIe link...\n" >&2
 	setpci -s "${bridge_id}" "CAP_EXP+10.w=0052" || \
 		die "Could not run setpci"

@@ -1,0 +1,11 @@
+[Unit]
+Description=Revive the Fibocom L860-GL WWAN modem after resume if suspend killed it
+After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/xmm-l860/xmm-resume-reset
+TimeoutStartSec=120
+
+[Install]
+WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target

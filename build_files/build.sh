@@ -45,3 +45,4 @@ grep -A10 '^\[terra-mesa\]$' /etc/yum.repos.d/terra-mesa.repo | grep -m1 '^enabl
 ### Enable services
 
 systemctl enable fprintd-lid-watch.service
+systemctl enable xmm-resume-reset.service
