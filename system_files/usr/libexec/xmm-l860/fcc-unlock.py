@@ -29,17 +29,39 @@ def find_at_port(ports):
     return ports[0] if ports else None
 
 
-def send(fd, cmd, wait=2):
+# ModemManager kills fcc-unlock.d hooks that run longer than 5s
+# (https://modemmanager.org/docs/modemmanager/fcc-unlock/) - budget well
+# under that. The original version of this script blindly slept 2s before
+# even checking for a response on every single AT command, which routinely
+# pushed the full challenge/response exchange past 10-20s and got it
+# silently killed (ModemManager only retries the fcc-unlock procedure once
+# per boot on failure, so this reliably broke WWAN until the next reboot).
+# The modem talks over a USB-CDC ACM port, not a slow UART - real
+# round-trip latency is a few tens of ms, so a short poll loop is enough.
+DEADLINE = 4.0
+
+
+def send(fd, cmd, timeout=0.8):
     os.write(fd, cmd.encode() + b"\r\n")
-    time.sleep(wait)
-    r, _, _ = select.select([fd], [], [], 2)
+    deadline = time.time() + timeout
     data = b""
-    if r:
-        data = os.read(fd, 4096)
+    while time.time() < deadline:
+        remaining = deadline - time.time()
+        r, _, _ = select.select([fd], [], [], max(0, remaining))
+        if not r:
+            break
+        chunk = os.read(fd, 4096)
+        if not chunk:
+            break
+        data += chunk
+        if b"OK" in data or b"ERROR" in data:
+            break
     return data
 
 
 def main():
+    start = time.time()
+
     if len(sys.argv) < 3:
         sys.exit(1)
 
@@ -66,10 +88,12 @@ def main():
     lib.compute_sha256.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p]
 
     for attempt in range(9):
+        if time.time() - start > DEADLINE:
+            break
+
         data = send(fd, "AT+GTFCCLOCKGEN")
         m = re.search(rb"0x[0-9a-fA-F]+", data)
         if not m:
-            time.sleep(0.5)
             continue
         challenge = int(m.group(0), 16)
 
@@ -82,12 +106,11 @@ def main():
         data = send(fd, f"AT+GTFCCLOCKVER={response}")
         if re.search(rb"\b1\b", data):
             send(fd, "AT+GTFCCLOCKMODEUNLOCK")
-            data = send(fd, "AT+CFUN=1", wait=3)
+            data = send(fd, "AT+CFUN=1", timeout=1.5)
             os.close(fd)
             if b"OK" in data:
                 sys.exit(0)
             sys.exit(3)
-        time.sleep(0.5)
 
     os.close(fd)
     sys.exit(4)
