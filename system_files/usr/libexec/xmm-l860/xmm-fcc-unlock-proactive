@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Runs fcc-unlock.py directly against the Fibocom L860-GL/XMM7360 modem,
+# instead of relying on ModemManager's own fcc-unlock.d hook mechanism.
+#
+# ModemManager picks the 'generic' plugin for this modem (8087:095a)
+# rather than its own 'intel' plugin, and that plugin does not recognize
+# this modem's network-personalization lock as a failed "bring modem
+# online" attempt - it reports "enabling" as successful even though the
+# modem is still locked at the firmware level, so the fcc-unlock.d hook
+# never gets invoked at all. Verified 2026-09-24: repeated registration
+# timeouts, zero log lines from the hook script, across multiple boots.
+# /etc/ModemManager/fcc-unlock.d/8087:095a is left in place as a harmless
+# fallback for whenever that ever starts working, but this script is now
+# the actual, reliable mechanism.
+#
+# ModemManager must not be running while fcc-unlock.py talks AT commands
+# on the same port - both processes issuing AT commands concurrently is
+# exactly the race that broke FCC unlock originally (see Bug #1 in
+# project_laptop_wwan_l860 in Claude's memory), back when the old
+# xmm-l860-boot.service ran concurrently with ModemManager's own port
+# probing. Stopping ModemManager here, for the few seconds this takes,
+# reproduces the same serialization the old boot-ordering (Before=
+# ModemManager.service) used to guarantee.
+
+die() {
+	echo "ERROR ${1}" >&2
+	exit 1
+}
+
+[ "$(whoami)" = "root" ] || die "must be root"
+
+for i in $(seq 1 20); do
+	[ -e /dev/ttyACM0 ] && break
+	sleep 1
+done
+[ -e /dev/ttyACM0 ] || die "no /dev/ttyACM0 after waiting"
+
+systemctl stop ModemManager.service
+sleep 1
+
+python3 /usr/libexec/xmm-l860/fcc-unlock.py "proactive" ttyACM0
+unlock_status=$?
+
+systemctl start ModemManager.service
+
+exit "${unlock_status}"

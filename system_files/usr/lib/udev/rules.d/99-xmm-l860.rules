@@ -4,7 +4,23 @@
 # Boot-Reihenfolge (Before=NetworkManager.service ModemManager.service) zu
 # vertrauen, reagiert diese Regel kausal auf das tatsaechliche Erscheinen
 # des Geraets - die USB-AT-Ports (und damit ModemManager) existieren
-# schlicht noch nicht, solange xmm2usb nicht durchgelaufen ist. Der
-# anschliessende FCC-Unlock laeuft separat als ModemManager-Hook, siehe
-# /etc/ModemManager/fcc-unlock.d/8087:095a.
+# schlicht noch nicht, solange xmm2usb nicht durchgelaufen ist.
 SUBSYSTEM=="pci", ATTR{vendor}=="0x8086", ATTR{device}=="0x7560", RUN+="/usr/libexec/xmm-l860/xmm2usb"
+
+# FCC-Unlock proaktiv statt ueber ModemManagers eigenen fcc-unlock.d-Hook
+# (/etc/ModemManager/fcc-unlock.d/8087:095a existiert weiterhin als
+# harmloser Fallback, wird aber empirisch nie aufgerufen): ModemManager
+# waehlt fuer 8087:095a das generic-Plugin statt des vorhandenen
+# intel-Plugins und erkennt den Fibocom-eigenen Network-Personalization-
+# Lock nicht als "Modem-Onlinegang fehlgeschlagen" - "enabling" wird als
+# erfolgreich gemeldet, obwohl das Modem firmwareseitig noch gesperrt
+# ist, und der fcc-unlock.d-Hook wird nie getriggert (verifiziert
+# 2026-09-24: 0 Log-Zeilen vom Hook trotz wiederholter
+# Registrierungs-Timeouts). ACTION=="add" + DEVTYPE=="usb_device" laesst
+# das nur einmal pro physischem Geraet feuern (nicht pro Interface des
+# Composite-USB-Geraets). systemd-run entkoppelt vom udev-Worker, da das
+# Skript ModemManager kurz stoppt/neu startet und mehrere Sekunden
+# braucht - siehe xmm-fcc-unlock-proactive fuer den Grund, warum
+# ModemManager waehrenddessen komplett gestoppt sein muss (AT-Port-Race,
+# siehe project_laptop_wwan_l860 in Claude's memory, Bug #1).
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="095a", ENV{DEVTYPE}=="usb_device", RUN+="/usr/bin/systemd-run --no-block /usr/libexec/xmm-l860/xmm-fcc-unlock-proactive"
