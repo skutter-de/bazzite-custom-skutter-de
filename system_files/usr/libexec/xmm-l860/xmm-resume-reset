@@ -70,7 +70,27 @@ for i in $(seq 1 20); do
 done
 
 if ! lsusb -d 8087:095a >/dev/null 2>&1; then
-	die "modem did not come back on USB after _RST"
+	# Our _RST above leaves the PCIe link enabled, unlike xmm2usb's own
+	# dance (which explicitly disables it before resetting) - that
+	# disable+reset combo, not just _RST on its own, is what actually
+	# triggers the modem firmware's fallback onto USB. Sometimes (not
+	# always - verified 2026-10-06) the modem instead just sits there as
+	# a stable, working native PCIe device after our plain _RST and
+	# never falls back on its own. Fall back to running xmm2usb's real
+	# dance directly - by now the PCI node is back (that part of the
+	# revival above did work), so its vendor/device sysfs scan can find
+	# it again.
+	echo "Modem didn't fall back to USB on its own, retrying via xmm2usb" >&2
+	/usr/libexec/xmm-l860/xmm2usb || die "xmm2usb fallback failed"
+
+	for i in $(seq 1 20); do
+		lsusb -d 8087:095a >/dev/null 2>&1 && break
+		sleep 1
+	done
+
+	if ! lsusb -d 8087:095a >/dev/null 2>&1; then
+		die "modem did not come back on USB even after xmm2usb fallback"
+	fi
 fi
 
 echo "Modem back on USB" >&2
