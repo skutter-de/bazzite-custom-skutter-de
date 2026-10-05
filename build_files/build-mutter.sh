@@ -34,6 +34,17 @@ dnf5 config-manager setopt "*.excludepkgs=" 2>/dev/null || true
 # final image (only the mutter/mutter-common RPMs built here do).
 dnf5 versionlock delete xorg-x11-server-Xwayland
 
+# Since 2026-09-21 Bazzite also versionlocks all mesa-* packages to a single
+# exact EVR (1:26.2.2-3.fc44 as of writing) - a completely separate
+# mechanism from the excludepkgs filter cleared above. mesa-*-devel from
+# terra-mesa (or a newer stock Fedora update) wants a different mesa-*
+# build than whatever that lock pins, and versionlock rejects every other
+# candidate from every repo, including sometimes the actually-installed
+# one - hence "conflicting requests"/"filtered out by exclude filtering"
+# for mesa-libgbm/-libEGL/-libGL-devel. Clear it the same way as Xwayland;
+# ephemeral builder stage, never reaches the final image.
+dnf5 versionlock delete mesa-dri-drivers mesa-filesystem mesa-libEGL mesa-libGL mesa-libgbm mesa-vulkan-drivers 2>/dev/null || true
+
 dnf5 download --source -y mutter
 rpm -i --define "_topdir ${WORKDIR}/rpmbuild" ./mutter-*.src.rpm
 
