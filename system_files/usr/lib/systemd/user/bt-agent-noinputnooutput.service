@@ -1,0 +1,11 @@
+[Unit]
+Description=Bluetooth NoInputNoOutput agent (Just Works BLE pairing)
+After=bluetooth.target
+
+[Service]
+ExecStart=/usr/libexec/bt-agent-noinputnooutput
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -2681,9 +2681,16 @@ static int btusb_close_barrot(struct hci_dev *hdev)
 	/* Chip stays scanning after power-off (our scan-disable intercept).
 	 * Queue a USB reset so the chip is power-cycled to a clean state;
 	 * without this HCI Reset times out on the next power-on.
+	 *
+	 * Delay 2 s before queuing so bluetoothd has time to persist
+	 * Powered=false for this adapter's MAC address.  Without the delay
+	 * the adapter re-enumerates before the power-off state is saved and
+	 * bluetoothd / GNOME restore the old Powered=true on reappearance,
+	 * making BT re-enable itself immediately after the user turned it off.
 	 */
 	if (test_bit(BTUSB_BARROT_EXT_SCAN_ACTIVE, &data->flags)) {
-		bt_dev_info(hdev, "Barrot: queuing USB reset to clear scan state");
+		bt_dev_info(hdev, "Barrot: waiting 2s then queuing USB reset to clear scan state");
+		msleep(2000);
 		usb_queue_reset_device(data->intf);
 	}
 

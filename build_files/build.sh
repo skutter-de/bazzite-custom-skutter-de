@@ -46,3 +46,4 @@ grep -A10 '^\[terra-mesa\]$' /etc/yum.repos.d/terra-mesa.repo | grep -m1 '^enabl
 
 systemctl enable fprintd-lid-watch.service
 systemctl enable xmm-resume-reset.service
+systemctl --global enable bt-agent-noinputnooutput.service
