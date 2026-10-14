@@ -27,7 +27,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=secret,id=mok_key \
     --mount=type=secret,id=mok_key_passphrase \
     --mount=type=secret,id=mok_pub \
-    /ctx/build-mutter.sh && /ctx/build-gnome-rounded-blur.sh && /ctx/build-acpi_call.sh
+    /ctx/build-mutter.sh && /ctx/build-gnome-rounded-blur.sh && /ctx/build-acpi_call.sh && /ctx/build-btusb-barrot.sh
 
 ### FINAL IMAGE
 ## Installs the RPMs built above plus everything else, as recommended by
