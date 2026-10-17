@@ -67,7 +67,7 @@ sed -i 's/^%autosetup -S git /%autosetup -p1 /' "${SPEC}"
 # 32-bit providers alongside 64-bit ones is what triggers most of the
 # "conflicting requests" noise from mesa/Xwayland multilib packages.
 dnf5 builddep -y --exclude='*.i686' "${SPEC}"
-rpmbuild -bb --define "_topdir ${WORKDIR}/rpmbuild" --nocheck "${SPEC}"
+rpmbuild -bb --define "_topdir ${WORKDIR}/rpmbuild" --define "_smp_ncpus_max $(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))" --nocheck "${SPEC}"
 
 RPMDIR="${WORKDIR}/rpmbuild/RPMS/x86_64"
 NOARCHDIR="${WORKDIR}/rpmbuild/RPMS/noarch"
