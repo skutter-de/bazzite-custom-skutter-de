@@ -977,6 +977,16 @@ struct qca_dump_info {
 #define BTUSB_RESET		19
 #define BTUSB_BARROT_EXT_SCAN_ACTIVE	20	/* ext scan was enabled; block the next disable */
 
+/* True after btusb_close_barrot queued a USB reset.  The next
+ * btusb_setup_barrot call will see this and skip the 2-second wait plus
+ * the BTUSB_BARROT_EXT_SCAN_ACTIVE pre-set: after a USB reset the chip
+ * starts in a clean state and does NOT auto-start extended scanning, so
+ * the intercept flag must not be pre-armed.  Without this, any close that
+ * follows the USB reset immediately (e.g. rfkill soft-block) would trigger
+ * another USB reset, causing an infinite loop.
+ */
+static bool barrot_after_usb_reset;
+
 struct btusb_data {
 	struct hci_dev       *hdev;
 	struct usb_device    *udev;
@@ -2690,6 +2700,7 @@ static int btusb_close_barrot(struct hci_dev *hdev)
 	 */
 	if (test_bit(BTUSB_BARROT_EXT_SCAN_ACTIVE, &data->flags)) {
 		bt_dev_info(hdev, "Barrot: waiting 2s then queuing USB reset to clear scan state");
+		barrot_after_usb_reset = true;
 		msleep(2000);
 		usb_queue_reset_device(data->intf);
 	}
@@ -2701,17 +2712,24 @@ static int btusb_setup_barrot(struct hci_dev *hdev)
 {
 	struct btusb_data *data = hci_get_drvdata(hdev);
 
-	/* Barrot firmware starts with LE extended scan always active.
-	 * Set the flag here so scan-related command intercepts apply from
-	 * the very first BlueZ init command (e.g. MGMT Add Device triggers
-	 * LE_Set_Ext_Scan_Params before any explicit scan enable is sent).
-	 * Without this the flag is 0 during early init and those commands
-	 * time out, causing a reinit crash loop with bonded devices present.
+	/* Barrot firmware starts with LE extended scan always active on a
+	 * cold power-on.  Set the flag here so scan-related command intercepts
+	 * apply from the very first BlueZ init command.
+	 *
+	 * After a USB reset (barrot_after_usb_reset == true) the chip starts
+	 * in a clean state and does NOT auto-start extended scanning.  Skip the
+	 * 2-second wait and do not pre-arm the flag so that a subsequent close
+	 * (e.g. rfkill soft-block) does not trigger yet another USB reset.
 	 */
-	bt_dev_info(hdev, "Barrot Technology chip: waiting for firmware ready");
-	msleep(2000);
-	set_bit(BTUSB_BARROT_EXT_SCAN_ACTIVE, &data->flags);
-	bt_dev_info(hdev, "Barrot Technology chip: ext scan disable intercept active");
+	if (barrot_after_usb_reset) {
+		barrot_after_usb_reset = false;
+		bt_dev_info(hdev, "Barrot Technology chip: post-reset setup, chip in clean state");
+	} else {
+		bt_dev_info(hdev, "Barrot Technology chip: waiting for firmware ready");
+		msleep(2000);
+		set_bit(BTUSB_BARROT_EXT_SCAN_ACTIVE, &data->flags);
+		bt_dev_info(hdev, "Barrot Technology chip: ext scan disable intercept active");
+	}
 	return 0;
 }
 
