@@ -977,15 +977,6 @@ struct qca_dump_info {
 #define BTUSB_RESET		19
 #define BTUSB_BARROT_EXT_SCAN_ACTIVE	20	/* ext scan was enabled; block the next disable */
 
-/* True after btusb_close_barrot queued a USB reset.  The next
- * btusb_setup_barrot call will see this and skip the 2-second wait plus
- * the BTUSB_BARROT_EXT_SCAN_ACTIVE pre-set: after a USB reset the chip
- * starts in a clean state and does NOT auto-start extended scanning, so
- * the intercept flag must not be pre-armed.  Without this, any close that
- * follows the USB reset immediately (e.g. rfkill soft-block) would trigger
- * another USB reset, causing an infinite loop.
- */
-static bool barrot_after_usb_reset;
 
 struct btusb_data {
 	struct hci_dev       *hdev;
@@ -2683,53 +2674,28 @@ static int btusb_send_frame_barrot(struct hci_dev *hdev, struct sk_buff *skb)
  */
 static int btusb_close_barrot(struct hci_dev *hdev)
 {
-	struct btusb_data *data = hci_get_drvdata(hdev);
-	int err;
-
-	err = btusb_close(hdev);
-
-	/* Chip stays scanning after power-off (our scan-disable intercept).
-	 * Queue a USB reset so the chip is power-cycled to a clean state;
-	 * without this HCI Reset times out on the next power-on.
-	 *
-	 * Delay 2 s before queuing so bluetoothd has time to persist
-	 * Powered=false for this adapter's MAC address.  Without the delay
-	 * the adapter re-enumerates before the power-off state is saved and
-	 * bluetoothd / GNOME restore the old Powered=true on reappearance,
-	 * making BT re-enable itself immediately after the user turned it off.
+	/* No USB reset needed: the chip always auto-starts LE Extended Scan
+	 * after any power-on or USB reset, so power-cycling does not produce
+	 * a clean state.  The send_frame/recv_event intercepts handle the
+	 * chip's persistent scanning on the next open.
 	 */
-	if (test_bit(BTUSB_BARROT_EXT_SCAN_ACTIVE, &data->flags)) {
-		bt_dev_info(hdev, "Barrot: waiting 2s then queuing USB reset to clear scan state");
-		barrot_after_usb_reset = true;
-		msleep(2000);
-		usb_queue_reset_device(data->intf);
-	}
-
-	return err;
+	return btusb_close(hdev);
 }
 
 static int btusb_setup_barrot(struct hci_dev *hdev)
 {
 	struct btusb_data *data = hci_get_drvdata(hdev);
 
-	/* Barrot firmware starts with LE extended scan always active on a
-	 * cold power-on.  Set the flag here so scan-related command intercepts
-	 * apply from the very first BlueZ init command.
-	 *
-	 * After a USB reset (barrot_after_usb_reset == true) the chip starts
-	 * in a clean state and does NOT auto-start extended scanning.  Skip the
-	 * 2-second wait and do not pre-arm the flag so that a subsequent close
-	 * (e.g. rfkill soft-block) does not trigger yet another USB reset.
+	/* Barrot firmware always auto-starts LE Extended Scan on power-on,
+	 * including after a USB reset.  Pre-arm the flag unconditionally so
+	 * the send_frame/recv_event intercepts are active from the very first
+	 * BlueZ init command.  The 2-second wait lets the chip start scanning
+	 * before we arm the intercept.
 	 */
-	if (barrot_after_usb_reset) {
-		barrot_after_usb_reset = false;
-		bt_dev_info(hdev, "Barrot Technology chip: post-reset setup, chip in clean state");
-	} else {
-		bt_dev_info(hdev, "Barrot Technology chip: waiting for firmware ready");
-		msleep(2000);
-		set_bit(BTUSB_BARROT_EXT_SCAN_ACTIVE, &data->flags);
-		bt_dev_info(hdev, "Barrot Technology chip: ext scan disable intercept active");
-	}
+	bt_dev_info(hdev, "Barrot Technology chip: waiting for firmware ready");
+	msleep(2000);
+	set_bit(BTUSB_BARROT_EXT_SCAN_ACTIVE, &data->flags);
+	bt_dev_info(hdev, "Barrot Technology chip: ext scan disable intercept active");
 	return 0;
 }
 
