@@ -42,7 +42,7 @@ sed -i '0,/^enabled=1$/{s/^enabled=1$/enabled=0/}' /etc/yum.repos.d/terra-mesa.r
 grep -A10 '^\[terra-mesa\]$' /etc/yum.repos.d/terra-mesa.repo | grep -m1 '^enabled=0$' || \
     { echo "terra-mesa.repo: enabled=0 did not take, aborting" >&2; exit 1; }
 
-mkdir -p /opt/appimagelauncher.AppDir
+mkdir -p /var/opt
 dnf5 install -y https://github.com/TheAssassin/AppImageLauncher/releases/download/v3.0.0-beta-3/appimagelauncher_3.0.0-beta-2-gha287.96cb937_x86_64.rpm
 
 ### Enable services
