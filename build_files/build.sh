@@ -45,6 +45,12 @@ grep -A10 '^\[terra-mesa\]$' /etc/yum.repos.d/terra-mesa.repo | grep -m1 '^enabl
 mkdir -p /var/opt
 dnf5 install -y https://github.com/TheAssassin/AppImageLauncher/releases/download/v3.0.0-beta-3/appimagelauncher_3.0.0-beta-2-gha287.96cb937_x86_64.rpm
 
+# bootc does not seed /var from the container image on existing-system upgrades,
+# only on fresh deployments. Move the AppDir to /usr/lib/ (OSTree-managed, always
+# updated) so it survives upgrades. A tmpfiles.d rule symlinks it back to
+# /var/opt/appimagelauncher.AppDir on every boot.
+cp -a /var/opt/appimagelauncher.AppDir /usr/lib/appimagelauncher.AppDir
+
 # Re-run depmod after all RPM installs to ensure extra/btusb.ko (from
 # kmod-btusb-barrot) is in modules.dep with priority over the stock module.
 # The RPM %post already runs depmod, but subsequent dnf5 transactions can
