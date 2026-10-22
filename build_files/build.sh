@@ -45,6 +45,13 @@ grep -A10 '^\[terra-mesa\]$' /etc/yum.repos.d/terra-mesa.repo | grep -m1 '^enabl
 mkdir -p /var/opt
 dnf5 install -y https://github.com/TheAssassin/AppImageLauncher/releases/download/v3.0.0-beta-3/appimagelauncher_3.0.0-beta-2-gha287.96cb937_x86_64.rpm
 
+# Re-run depmod after all RPM installs to ensure extra/btusb.ko (from
+# kmod-btusb-barrot) is in modules.dep with priority over the stock module.
+# The RPM %post already runs depmod, but subsequent dnf5 transactions can
+# silently overwrite modules.dep without the extra/ entry.
+KVER="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core)"
+depmod -a "${KVER}"
+
 ### Enable services
 
 systemctl enable fprintd-lid-watch.service
