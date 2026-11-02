@@ -45,6 +45,15 @@ dnf5 versionlock delete xorg-x11-server-Xwayland
 # ephemeral builder stage, never reaches the final image.
 dnf5 versionlock delete mesa-dri-drivers mesa-filesystem mesa-libEGL mesa-libGL mesa-libgbm mesa-vulkan-drivers 2>/dev/null || true
 
+# Since the Oct-2026 Bazzite base-image update terra-mesa uses epoch 1 for
+# mesa packages (installed: 1:26.2.4-1.fc44). No matching mesa-libgbm-devel
+# exists for that exact epoch anywhere — only terra-mesa's newer 1:26.2.6-2
+# provides one. After removing the versionlock, explicitly upgrade all mesa
+# packages (both x86_64 and i686 must move together — mesa enforces
+# same-EVR across arches) so that mesa-libgbm-devel becomes satisfiable for
+# the subsequent builddep call.
+dnf5 upgrade -y 'mesa-*' 2>/dev/null || true
+
 dnf5 download --source -y mutter
 rpm -i --define "_topdir ${WORKDIR}/rpmbuild" ./mutter-*.src.rpm
 
