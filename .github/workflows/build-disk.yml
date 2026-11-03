@@ -160,21 +160,25 @@ jobs:
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "title=Disk images ${TAG#disk-}" >> "${GITHUB_OUTPUT}"
           find artifacts -type f | sort
-          # bootc-image-builder already writes its own checksum files
-          # alongside each disk image; nothing extra to generate here.
+          # Generate SHA256 checksums for each disk image. BIB does not write
+          # checksum files itself; we generate them here so the release has
+          # something to attach (the images themselves are >2 GB each and
+          # exceed GitHub's release asset limit).
+          while IFS= read -r f; do
+            (cd "$(dirname "$f")" && sha256sum "$(basename "$f")" > "$(basename "$f").sha256")
+          done < <(find artifacts -type f ! -name '*.sha256')
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # artifacts/**/* would need `shopt -s globstar`, which Actions'
-          # default bash run-shell doesn't enable - enumerate explicitly.
-          # Exclude .iso files: Anaconda ISOs are typically >2 GB and exceed
-          # GitHub's release asset limit (2 147 483 648 bytes). The ISO is
-          # still available as a build artifact for the default retention period.
-          mapfile -t files < <(find artifacts -type f ! -name '*.iso')
+          # Both qcow2 and Anaconda-ISO exceed GitHub's 2 GB release asset
+          # limit, so only attach the generated .sha256 checksum files.
+          # The actual disk images are available as Actions artifacts for the
+          # default repository retention period.
+          mapfile -t files < <(find artifacts -type f -name '*.sha256')
           gh release create "${{ steps.prep.outputs.tag }}" \
             --repo "${{ github.repository }}" \
             --title "${{ steps.prep.outputs.title }}" \
-            --notes "Automatischer woechentlicher Build (qcow2) von \`${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}\` (Digest zum Build-Zeitpunkt, siehe build.yml-Läufe für Details). Die Anaconda-ISO ist als Actions-Artifact verfügbar (ISO >2 GB, überschreitet GitHub-Release-Limit)." \
+            --notes "Automatischer woechentlicher Build (qcow2 + Anaconda-ISO) von \`${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}\`. Die Disk-Images (qcow2 + ISO, je >2 GB) sind als [Actions-Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) verfügbar." \
             "${files[@]}"
