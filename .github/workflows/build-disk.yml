@@ -169,9 +169,12 @@ jobs:
         run: |
           # artifacts/**/* would need `shopt -s globstar`, which Actions'
           # default bash run-shell doesn't enable - enumerate explicitly.
-          mapfile -t files < <(find artifacts -type f)
+          # Exclude .iso files: Anaconda ISOs are typically >2 GB and exceed
+          # GitHub's release asset limit (2 147 483 648 bytes). The ISO is
+          # still available as a build artifact for the default retention period.
+          mapfile -t files < <(find artifacts -type f ! -name '*.iso')
           gh release create "${{ steps.prep.outputs.tag }}" \
             --repo "${{ github.repository }}" \
             --title "${{ steps.prep.outputs.title }}" \
-            --notes "Automatischer woechentlicher Build (qcow2 + Anaconda-ISO) von \`${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}\` (Digest zum Build-Zeitpunkt, siehe build.yml-Läufe für Details)." \
+            --notes "Automatischer woechentlicher Build (qcow2) von \`${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}\` (Digest zum Build-Zeitpunkt, siehe build.yml-Läufe für Details). Die Anaconda-ISO ist als Actions-Artifact verfügbar (ISO >2 GB, überschreitet GitHub-Release-Limit)." \
             "${files[@]}"
