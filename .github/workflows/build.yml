@@ -152,8 +152,16 @@ jobs:
           ALIAS_TAGS: ${{ steps.gen-build-tags.outputs.alias_tags }}
         run: |
           set -euox pipefail
+          # sudo -E is ignored on ubuntu-26.04; capture the runner's Docker
+          # credential file path before entering sudo so we can pass it
+          # explicitly via --authfile.
+          RUNNER_DOCKER_CONFIG="${HOME}/.docker/config.json"
           for tag in ${ALIAS_TAGS}; do
-            sudo -E podman push --digestfile=/tmp/digestfile ${IMAGE_NAME}:${tag} ${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}
+            sudo podman push \
+              --authfile="${RUNNER_DOCKER_CONFIG}" \
+              --digestfile=/tmp/digestfile \
+              ${IMAGE_NAME}:${tag} \
+              ${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}
           done
 
           digest=$(< /tmp/digestfile)
