@@ -87,9 +87,13 @@ jobs:
       - name: Build Image
         id: build-image
         run: |
-          sudo -E $(command -v just) build \
-            ${IMAGE_NAME} \
-            ${DEFAULT_TAG}
+          sudo env \
+            MOK_KEY_FILE="${MOK_KEY_FILE}" \
+            MOK_PASS_FILE="${MOK_PASS_FILE}" \
+            MOK_PUB_FILE="${MOK_PUB_FILE}" \
+            $(command -v just) build \
+              ${IMAGE_NAME} \
+              ${DEFAULT_TAG}
           shred -u "${MOK_KEY_FILE}" "${MOK_PASS_FILE}" "${MOK_PUB_FILE}"
 
       # This is optional, this provides smaller delta updates
