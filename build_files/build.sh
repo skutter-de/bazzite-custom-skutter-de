@@ -14,13 +14,11 @@ cp -avf "/ctx/system_files"/. /
 
 dnf5 install -y libvirt qemu-kvm virt-viewer gtk4-layer-shell
 
-# Wacom ghost-cursor fix (patched mutter/mutter-common), gnome-rounded-blur
-# (for Blur my Shell's rounded-corner support) and the signed acpi_call
-# kernel module were all built in the builder stage; install the results.
-# rpmbuild's --define "_rpmdir /rpms" (used by gnome-rounded-blur and
-# kmod-acpi_call) always creates an arch subdirectory under it, unlike
-# build-mutter.sh's flat `cp ... /rpms/`, so a plain /rpms/*.rpm glob misses
-# them - find every *.rpm anywhere under /rpms instead.
+# gnome-rounded-blur (for Blur my Shell's rounded-corner support) and the
+# signed acpi_call kernel module were both built in the builder stage;
+# install the results. rpmbuild's --define "_rpmdir /rpms" always creates an
+# arch subdirectory under it, so a plain /rpms/*.rpm glob would miss them -
+# find every *.rpm anywhere under /rpms instead.
 dnf5 install -y $(find /rpms -name '*.rpm' ! -name '*-debuginfo-*' ! -name '*-debugsource-*')
 
 # The base image ships terra-mesa enabled by default (for its own mesa
@@ -28,7 +26,7 @@ dnf5 install -y $(find /rpms -name '*.rpm' ! -name '*-debuginfo-*' ! -name '*-de
 # again). Leaving it enabled in the shipped image breaks bootc-image-builder's
 # ISO manifest depsolve: it fails to read the repo's local file://
 # gpgkey from within its own build sandbox ("Could not read a file:// file
-# for .../RPM-GPG-KEY-terra44-mesa"), even though that key is present and
+# for .../RPM-GPG-KEY-terra45-mesa"), even though that key is present and
 # correct in the actual running system. Switch it back off now that we're
 # done with it - doesn't affect already-installed packages, next image
 # build re-enables+uses it fresh from the base image regardless.
@@ -38,8 +36,12 @@ dnf5 install -y $(find /rpms -name '*.rpm' ! -name '*-debuginfo-*' ! -name '*-de
 # image after using it) - it only affects dnf5's own runtime view, which
 # bootc-image-builder's separate depsolve process never reads anyway.
 # Edit the repo file directly instead.
-sed -i '0,/^enabled=1$/{s/^enabled=1$/enabled=0/}' /etc/yum.repos.d/terra-mesa.repo
-grep -A10 '^\[terra-mesa\]$' /etc/yum.repos.d/terra-mesa.repo | grep -m1 '^enabled=0$' || \
+# F45 moved repo files from /etc/yum.repos.d/ to /usr/share/dnf5/repos.d/;
+# detect the path dynamically to stay forward-compatible.
+TERRA_MESA_REPO="$(find /usr/share/dnf5/repos.d /etc/yum.repos.d -name 'terra-mesa.repo' 2>/dev/null | head -1)"
+[ -n "${TERRA_MESA_REPO}" ] || { echo "terra-mesa.repo not found, aborting" >&2; exit 1; }
+sed -i '0,/^enabled=1$/{s/^enabled=1$/enabled=0/}' "${TERRA_MESA_REPO}"
+grep -A10 '^\[terra-mesa\]$' "${TERRA_MESA_REPO}" | grep -m1 '^enabled=0$' || \
     { echo "terra-mesa.repo: enabled=0 did not take, aborting" >&2; exit 1; }
 
 mkdir -p /var/opt
@@ -50,13 +52,6 @@ dnf5 install -y https://github.com/TheAssassin/AppImageLauncher/releases/downloa
 # updated) so it survives upgrades. A tmpfiles.d rule symlinks it back to
 # /var/opt/appimagelauncher.AppDir on every boot.
 cp -a /var/opt/appimagelauncher.AppDir /usr/lib/appimagelauncher.AppDir
-
-# Re-run depmod after all RPM installs to ensure extra/btusb.ko (from
-# kmod-btusb-barrot) is in modules.dep with priority over the stock module.
-# The RPM %post already runs depmod, but subsequent dnf5 transactions can
-# silently overwrite modules.dep without the extra/ entry.
-KVER="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core)"
-depmod -a "${KVER}"
 
 ### Enable services
 

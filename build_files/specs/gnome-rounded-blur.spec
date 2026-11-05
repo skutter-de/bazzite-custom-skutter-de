@@ -1,5 +1,5 @@
 Name:           gnome-rounded-blur
-Version:        1.0.1
+Version:        1.0.2
 Release:        1%{?dist}
 Summary:        Standalone library providing Blur.BlurEffect with corner radius support for GNOME Shell extensions
 
@@ -12,9 +12,7 @@ BuildRequires:  ninja-build
 BuildRequires:  gcc
 BuildRequires:  pkgconfig(glib-2.0) >= 2.66
 BuildRequires:  pkgconfig(gobject-2.0) >= 2.66
-BuildRequires:  pkgconfig(mutter-clutter-18)
-BuildRequires:  pkgconfig(mutter-cogl-18)
-BuildRequires:  pkgconfig(libmutter-18)
+BuildRequires:  mutter-devel
 BuildRequires:  gobject-introspection-devel
 
 Requires:       mutter%{?_isa}
@@ -26,8 +24,8 @@ GNOME Shell's own ShellBlurEffect with a corner mask and a different GIR
 namespace (Blur). Used by the "Blur my Shell" GNOME Shell extension to
 support rounded corners on blurred surfaces.
 
-Built against libmutter API version 18 (mutter >= 50.0). Needs to be rebuilt
-whenever the mutter/GNOME Shell ABI changes.
+Built against stock mutter-devel; v1.0.2+ auto-detects the installed
+libmutter API version via pkg-config (supports mutter 51+).
 
 %prep
 %autosetup

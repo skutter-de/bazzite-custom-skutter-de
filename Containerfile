@@ -8,13 +8,13 @@ FROM ghcr.io/ublue-os/bazzite-gnome:stable AS base
 
 ### BUILDER
 ## Builds everything that needs compiling against this image's own package
-## versions (patched mutter, gnome-rounded-blur, signed acpi_call kernel
-## module). None of the build tools used here end up in the final image -
-## only the resulting RPMs, copied out of /rpms below.
+## versions (gnome-rounded-blur, signed acpi_call kernel module). None of
+## the build tools used here end up in the final image - only the resulting
+## RPMs, copied out of /rpms below.
 
 FROM base AS builder
 
-# All three build scripts run in a single RUN/layer on purpose: splitting
+# Both build scripts run in a single RUN/layer on purpose: splitting
 # them across layer boundaries repeatedly hit real RPM-database corruption
 # on the build runner ("rpmdb: damaged header", "database disk image is
 # malformed") once a layer with heavy package activity got snapshotted and
@@ -27,7 +27,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=secret,id=mok_key \
     --mount=type=secret,id=mok_key_passphrase \
     --mount=type=secret,id=mok_pub \
-    /ctx/build-mutter.sh && /ctx/build-gnome-rounded-blur.sh && /ctx/build-acpi_call.sh && /ctx/build-btusb-barrot.sh
+    /ctx/build-gnome-rounded-blur.sh && /ctx/build-acpi_call.sh
 
 ### FINAL IMAGE
 ## Installs the RPMs built above plus everything else, as recommended by
