@@ -50,7 +50,7 @@ jobs:
     # inputs.platform is only set on workflow_dispatch; schedule/pull_request
     # runs have no inputs at all, so default those to the amd64 runner
     # instead of falling through to arm64.
-    runs-on: ${{ inputs.platform == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.platform == 'arm64' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
     strategy:
       fail-fast: false
       matrix:
